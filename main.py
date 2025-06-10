@@ -12,7 +12,7 @@ if(example == 1): #  MBBBeam
     fixed= np.union1d(np.arange(0,2*(nely+1),2), 2*(nelx+1)*(nely+1)-2*(nely+1)+1)
     forceBC = np.zeros((ndof,1)) 
     forceBC[2*(nely+1)+1 ,0]=-1 
-elif(example == 1): #  TipCantilever, cantilever with a loading at bottom-right corner
+elif(example == 2): #  TipCantilever, cantilever with a loading at bottom-right corner
     exampleName = 'TipCantilever'
     ndof = 2*(nelx+1)*(nely+1) 
     dofs=np.arange(ndof) 
