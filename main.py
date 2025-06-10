@@ -1,6 +1,6 @@
 import numpy as np
 from FE import StructuralFE
-
+#test
 nelx = 60
 nely = 30
 example = 1
