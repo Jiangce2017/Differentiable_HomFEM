@@ -12,6 +12,7 @@ if sys.platform == 'linux':
     import torch_sparse_solve 
 #-----------------------#
 # Testing testing
+# PLZ WORK
 #%%  structural FE
 class StructuralFE:
     #-----------------------#
