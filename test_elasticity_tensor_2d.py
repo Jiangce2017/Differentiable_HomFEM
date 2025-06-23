@@ -17,19 +17,19 @@ def load_shapespace_example(index, shape_path='ShapeSpace.mat', prop_path='Prope
         C22 = props[2, index]
         C66 = props[3, index]
 
-    Q_ex = np.array([[C11, C12, 0], [C12, C22, 0], [0, 0, C66]])
+    Q_example = np.array([[C11, C12, 0], [C12, C22, 0], [0, 0, C66]])
 
-    return xPhys, Q_ex
+    return xPhys, Q_example
 
 
 if __name__ == '__main__':
     sample_index = 0
-    xPhys, Q_ex = load_shapespace_example(sample_index)
+    xPhys, Q_example = load_shapespace_example(sample_index)
 
     Q_code = elasticity(xPhys)
     print(f"\n=== Sample #{sample_index} ===")
-    print("\nComputed Elasticity Tensor (Q_pred):")
-    print(np.round(Q_pred, 4))
+    print("\nComputed Elasticity Tensor (Q example):")
+    print(np.round(Q_example, 4))
 
-    print("\nReference Elasticity Tensor (Q_ref):")
-    print(np.round(Q_ref, 4))
+    print("\nReference Elasticity Tensor (Q code):")
+    print(np.round(Q_code, 4))
