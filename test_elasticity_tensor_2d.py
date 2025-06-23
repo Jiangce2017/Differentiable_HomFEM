@@ -6,8 +6,7 @@ def load_shapespace_example(index, shape_path='ShapeSpace.mat', prop_path='Prope
     with h5py.File(shape_path,'r') as f:
         shape_key = list(f.keys())[0]
         dset = f[shape_key]
-        xPhys = np.empty((50,50), dtype=np.float32)
-        dset.read_direct(xPhys, source_sel=np.s_[:, :, index])  # Load one slice only
+        xPhys = dset[:, :, index]
         xPhys = xPhys.T  # Transpose to (nely, nelx) expected by elasticity()
 
 
@@ -25,16 +24,13 @@ def load_shapespace_example(index, shape_path='ShapeSpace.mat', prop_path='Prope
 
 
 if __name__ == '__main__':
-    sample_index = 0
-    print(f"\nTesting microstructure at index {sample_index}")
+    sample_index = 0 # can change this value
     xPhys, Q_example = load_shapespace_example(sample_index)
-
     Q_code = elasticity(xPhys)
-    print("\n Input Microstructure Shape (xPhys): 50 x 50 binary grid")
-    print("(omitted from print to save space)\n")
 
-    print("Elasticity Tensor from Your Code (Q_code):")
+    print("Q_code (from your FEM):")
     print(np.round(Q_code, 4))
 
-    print("\n Reference Elasticity Tensor from Dataset (Q_example):")
+    print("\nQ_example (from dataset):")
     print(np.round(Q_example, 4))
+
