@@ -6,8 +6,11 @@ def load_shapespace_example(index, shape_path='ShapeSpace.mat', prop_path='Prope
     with h5py.File(shape_path,'r') as f:
         key = list(f.keys())[0]
         dataset = f[key]
-        xPhys = dataset[:, :, index]
-        xPhys = xPhys.T
+        # Allocate empty array to store just 1 sample
+        xPhys = np.empty((50, 50), dtype=np.float32)
+        dset.read_direct(xPhys, source_sel=np.s_[:, :, index])  # direct, minimal memory
+
+        xPhys = xPhys.T  # Transpose if needed (to match expected layout)
 
     with h5py.File(prop_path,'r') as f:
         key = list(f.keys())[0]
