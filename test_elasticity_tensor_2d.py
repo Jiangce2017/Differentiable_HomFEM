@@ -4,7 +4,7 @@ from elasticity_tensor_2d import elasticity
 
 def load_shapespace_example(index, shape_path='ShapeSpace.mat', prop_path='PropertySpace.mat' ):
     with h5py.File(shape_path,'r') as f:
-        shape_key = list(f.keys())[0]
+        shape_key = list(f.keys())[0] # can change to use custom shape
         dset = f[shape_key]
         xPhys = dset[:, :, index]
         xPhys = xPhys.T  # Transpose to (nely, nelx) expected by elasticity()
