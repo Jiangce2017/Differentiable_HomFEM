@@ -7,9 +7,9 @@ default: &DEFAULT
   lattice_dataset: 'strut'
   lattice_data_file_path: './data/struct/dataset_strut.pkl'
   vae_file_path: './data/struct/vae.pickle'
-  cell_width: 40
-  nelx: 40
-  nely: 40
+  cell_width: 20
+  nelx: 20
+  nely: 20
   len_x: 1
   len_y: 1
   max_grad: 10 # 10
@@ -27,7 +27,7 @@ default: &DEFAULT
   numLayers: 5 # the depth of the NN
   numNeuronsPerLyr: 20 # the height of the NN
   minEpochs: 100  # minimum number of iterations
-  maxEpochs: 5000  # Max number of iterations
+  maxEpochs: 500  # Max number of iterations
   penal: 2  # SIMP penalization constant, starting value
   Emin: 1e-6
   Emax: 1.0
