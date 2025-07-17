@@ -37,7 +37,7 @@ def tile_lattice_to_mask(lattice_tile, mask):
 
     return tiled
 
-def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=1.0, filename="dogbone_lattice.stl"):
+def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=1.0, filename="results/dogbone_lattice.stl"):
     # Create 3D voxel array
     voxels = np.repeat(lattice_2d[:, :, np.newaxis], int(thickness_mm), axis=2)
 
@@ -57,7 +57,7 @@ def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=1.0, filename
     print(f"STL file saved to {filename}")
 
 def main():
-    lattice_path = "lattice_output.npy"  # <- Update this to your actual file
+    lattice_path = "results/lattice_output.npy"  # <- Update this to your actual file
     if not os.path.exists(lattice_path):
         raise FileNotFoundError(f"Cannot find {lattice_path}")
 
