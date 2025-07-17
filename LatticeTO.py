@@ -142,7 +142,7 @@ class TopologyOptimizer:
         ### save data
         torch.save(self.topNet, savedNetFileName)
         
-    def plotTO(self, iter,saveFig=True, saveFrame=False):
+    def plotTO(self, iter,saveFig=False, saveFrame=False):
         w = self.cell_width
         batch_x = self.xy.view(-1,2).float().to(device)  
         nn_rho = self.topNet(batch_x,1,self.nonDesignIdx)
