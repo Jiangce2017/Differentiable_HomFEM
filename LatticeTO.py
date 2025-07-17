@@ -142,7 +142,7 @@ class TopologyOptimizer:
         ### save data
         torch.save(self.topNet, savedNetFileName)
         
-    def plotTO(self, iter,saveFig=False, saveFrame=False):
+    def plotTO(self, iter,saveFig=True, saveFrame=False):
         w = self.cell_width
         batch_x = self.xy.view(-1,2).float().to(device)  
         nn_rho = self.topNet(batch_x,1,self.nonDesignIdx)
@@ -180,7 +180,7 @@ class TopologyOptimizer:
         if (saveFig):    
             fName = osp.join(self.results_dir, self.exper_name+'_topology.png')
             plt.savefig(fName,dpi = 450,transparent=True)
-            np.save("lattice_output.npy", img.astype(np.uint8))  # save as 0-1 ints
+            np.save("results/lattice_output.npy", img.astype(np.uint8))  # save as 0-1 ints
 
         if self.interactive:  
             plt.pause(0.01)
