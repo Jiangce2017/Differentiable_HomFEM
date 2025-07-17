@@ -84,7 +84,7 @@ def main():
     plt.show()
 
     # User-defined thickness
-    thickness_mm = float(input("Enter desired thickness (in mm): "))
+    thickness_mm = float(input("Enter desired thickness (in mm): ")) #standard size is 3.2mm
     filename = get_unique_filename()
     extrude_and_export_stl(tiled_lattice, thickness_mm, filename=filename)
 
