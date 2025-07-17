@@ -37,7 +37,16 @@ def tile_lattice_to_mask(lattice_tile, mask):
 
     return tiled
 
-def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=1.0, filename="results/dogbone_lattice.stl"):
+def get_unique_filename(base_name="dogbone_lattice", ext=".stl", folder="results/dogbones"):
+    i = 0
+    while True:
+        filename = f"{base_name}{i if i else ''}{ext}"
+        full_path = os.path.join(folder, filename)
+        if not os.path.exists(full_path):
+            return full_path
+        i += 1
+
+def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=1.0, filename="results/dogbones/dogbone_lattice.stl"):
     # Create 3D voxel array
     voxels = np.repeat(lattice_2d[:, :, np.newaxis], int(thickness_mm), axis=2)
 
@@ -57,14 +66,14 @@ def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=1.0, filename
     print(f"STL file saved to {filename}")
 
 def main():
-    lattice_path = "results/lattice_output.npy"  # <- Update this to your actual file
+    lattice_path = "results/lattice_output.npy"
     if not os.path.exists(lattice_path):
         raise FileNotFoundError(f"Cannot find {lattice_path}")
 
     lattice_tile = np.load(lattice_path)  # Must be 2D, e.g., 20x20
     assert lattice_tile.ndim == 2, "Lattice must be 2D!"
 
-    resolution = lattice_tile.shape[0]  # assuming square tile, e.g. 20x20
+    resolution = lattice_tile.shape[0]
     domain_mask = generate_dogbone_mask(resolution=resolution)
     tiled_lattice = tile_lattice_to_mask(lattice_tile, domain_mask)
 
@@ -76,7 +85,8 @@ def main():
 
     # User-defined thickness
     thickness_mm = float(input("Enter desired thickness (in mm): "))
-    extrude_and_export_stl(tiled_lattice, thickness_mm)
+    filename = get_unique_filename()
+    extrude_and_export_stl(tiled_lattice, thickness_mm, filename=filename)
 
 if __name__ == "__main__":
     main()

@@ -3,4 +3,4 @@
 # Except this file
 !.gitignore
 
-/results/dogbone_lattice.stl
+/results/dogbones
