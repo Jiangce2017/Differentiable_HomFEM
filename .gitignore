@@ -2,6 +2,3 @@
 .gitignore
 # Except this file
 !.gitignore
-
-results/dogbone_lattice.stl
-dogbone_lattice.stl
