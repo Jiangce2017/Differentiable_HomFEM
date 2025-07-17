@@ -1,6 +1,4 @@
 import numpy as np
-
-# Hello hello
 import random
 import torch
 import time
