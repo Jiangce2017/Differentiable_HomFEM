@@ -36,7 +36,7 @@ def tile_lattice_to_mask(lattice_tile, mask):
                 tiled[y:y+tile_h, x:x+tile_w] = lattice_tile
 
     return tiled
-
+#Able to get unique file names for different dogbones
 def get_unique_filename(base_name="dogbone_lattice", ext=".stl", folder="results/dogbones"):
     i = 0
     while True:
