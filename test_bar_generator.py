@@ -4,7 +4,7 @@ from skimage import measure
 from stl import mesh
 import os
 
-def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, length_gauge_mm=57, resolution=0.5): #0.5 is 2mm x 2mm and 1mm x1mm is 1
+def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, length_gauge_mm=57, resolution=2): #0.5 is 2mm x 2mm and 1mm x1mm is 1
     pixel_per_mm = resolution
     gage_start_mm = (length_mm - length_gauge_mm) // 2
 
@@ -29,6 +29,7 @@ def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, le
 def tile_lattice_to_mask(lattice_tile, mask):
     tiled = np.zeros_like(mask, dtype=np.uint8)
     tile_h, tile_w = lattice_tile.shape
+    print("tile_h: {}, tile_w: {}".format(tile_h, tile_w))
 
     for y in range(0, mask.shape[0] - tile_h + 1, tile_h):
         for x in range(0, mask.shape[1] - tile_w + 1, tile_w):
@@ -72,21 +73,28 @@ def main():
 
     lattice_tile = np.load(lattice_path)  # Must be 2D, e.g., 20x20
     assert lattice_tile.ndim == 2, "Lattice must be 2D!"
+    plt.imshow(lattice_tile, cmap='Greens')
+    plt.title("Lattice")
+    plt.axis('off')
+    plt.show()
 
-    resolution = lattice_tile.shape[0]
+    #resolution = lattice_tile.shape[0]
+    resolution = 10
+    print("resolution: {}".format(resolution))
     domain_mask = generate_dogbone_mask(resolution=resolution)
     tiled_lattice = tile_lattice_to_mask(lattice_tile, domain_mask)
+    print("tiled_lattice shape: {}".format(tiled_lattice.shape))
 
     # Optional: visualize the 2D layout
-    plt.imshow(tiled_lattice, cmap='gray')
+    plt.imshow(tiled_lattice, cmap='Greens')
     plt.title("Tiled Lattice in ASTM D638 Dogbone")
     plt.axis('off')
     plt.show()
 
-    # User-defined thickness
-    thickness_mm = float(input("Enter desired thickness (in mm): ")) #standard size is 3.2mm
-    filename = get_unique_filename()
-    extrude_and_export_stl(tiled_lattice, thickness_mm, filename=filename)
+    # # User-defined thickness
+    # thickness_mm = float(input("Enter desired thickness (in mm): ")) #standard size is 3.2mm
+    # filename = get_unique_filename()
+    # extrude_and_export_stl(tiled_lattice, thickness_mm, filename=filename)
 
 if __name__ == "__main__":
     main()
