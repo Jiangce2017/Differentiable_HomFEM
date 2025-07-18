@@ -4,25 +4,26 @@ from skimage import measure
 from stl import mesh
 import os
 
-def generate_dogbone_mask(length_mm=166, width_gauge_mm=14, width_ends_mm=20, length_gauge_mm=58, resolution=0.5):
-    pixel_per_mm = resolution
+def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, length_gauge_mm=57, resolution=0.5):
+    pixel_per_mm = 1 / resolution  # Pixels per mm
     gage_start_mm = (length_mm - length_gauge_mm) / 2  # use float division
 
-    width_gauge_px = round(width_gauge_mm * pixel_per_mm)
-    width_ends_px = round(width_ends_mm * pixel_per_mm)
-    length_total_px = round(length_mm * pixel_per_mm)
-    length_gauge_px = round(length_gauge_mm * pixel_per_mm)
-    gage_start_px = round(gage_start_mm * pixel_per_mm)
+    # Halve the pixel counts to account for 2mm x 2mm elements (effectively doubling resolution in terms of element size)
+    width_gauge_px = int(width_gauge_mm * pixel_per_mm // 2)
+    width_ends_px = int(width_ends_mm * pixel_per_mm // 2)
+    length_total_px = int(length_mm * pixel_per_mm // 2)
+    length_gauge_px = int(length_gauge_mm * pixel_per_mm // 2)
+    gage_start_px = int(gage_start_mm * pixel_per_mm // 2)
 
     domain = np.zeros((length_total_px, width_ends_px), dtype=np.uint8)
 
     # Middle gauge section
-    domain[gage_start_px:gage_start_px+length_gauge_px,
-           (width_ends_px-width_gauge_px)//2:(width_ends_px+width_gauge_px)//2] = 1
+    domain[gage_start_px:gage_start_px + length_gauge_px,
+           (width_ends_px - width_gauge_px) // 2:(width_ends_px + width_gauge_px) // 2] = 1
 
     # End grips
     domain[:gage_start_px, :] = 1
-    domain[gage_start_px+length_gauge_px:, :] = 1
+    domain[gage_start_px + length_gauge_px:, :] = 1
 
     return domain
 
@@ -36,7 +37,7 @@ def tile_lattice_to_mask(lattice_tile, mask):
                 tiled[y:y+tile_h, x:x+tile_w] = lattice_tile
 
     return tiled
-#Able to get unique file names for different dogbones
+
 def get_unique_filename(base_name="dogbone_lattice", ext=".stl", folder="results/dogbones"):
     i = 0
     while True:
@@ -48,7 +49,7 @@ def get_unique_filename(base_name="dogbone_lattice", ext=".stl", folder="results
 
 def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=2.0, filename="results/dogbones/dogbone_lattice.stl"):
     # Create 3D voxel array
-    voxels = np.repeat(lattice_2d[:, :, np.newaxis], int(thickness_mm), axis=2)
+    voxels = np.repeat(lattice_2d[:, :, np.newaxis], int(thickness_mm / voxel_size_mm), axis=2)
 
     # Convert to mesh using marching cubes
     verts, faces, _, _ = measure.marching_cubes(voxels, level=0.5)
@@ -73,23 +74,20 @@ def main():
     lattice_tile = np.load(lattice_path)  # Must be 2D, e.g., 20x20
     assert lattice_tile.ndim == 2, "Lattice must be 2D!"
 
-    #resolution = lattice_tile.shape[0]
-    resolution = 10
+    resolution = lattice_tile.shape[0] / 2  # Halve resolution for 2mm elements
     domain_mask = generate_dogbone_mask(resolution=resolution)
     tiled_lattice = tile_lattice_to_mask(lattice_tile, domain_mask)
 
     # Optional: visualize the 2D layout
-    plt.imshow(tiled_lattice, cmap='Greens')
+    plt.imshow(tiled_lattice, cmap='gray')
     plt.title("Tiled Lattice in ASTM D638 Dogbone")
     plt.axis('off')
     plt.show()
 
     # User-defined thickness
-    #thickness_mm = float(input("Enter desired thickness (in mm): ")) #standard size is 3.2mm
-    thickness_mm = 4
+    thickness_mm = float(input("Enter desired thickness (in mm): "))  # standard size is 3.2mm
     filename = get_unique_filename()
     extrude_and_export_stl(tiled_lattice, thickness_mm, voxel_size_mm=2.0, filename=filename)
-
 
 if __name__ == "__main__":
     main()
