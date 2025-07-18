@@ -4,7 +4,7 @@ from skimage import measure
 from stl import mesh
 import os
 
-def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, length_gauge_mm=57, resolution=20):
+def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, length_gauge_mm=57, resolution=1):
     pixel_per_mm = resolution
     gage_start_mm = (length_mm - length_gauge_mm) // 2
 
