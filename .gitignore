@@ -3,5 +3,5 @@
 # Except this file
 !.gitignore
 
-/results/dogbones
+/results
 /test_bar_generator.py

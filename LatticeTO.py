@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import torch
+import os
 import time
 import torch.nn as nn
 import torch.optim as optim
@@ -180,9 +181,19 @@ class TopologyOptimizer:
         if (saveFig):    
             fName = osp.join(self.results_dir, self.exper_name+'_topology.png')
             plt.savefig(fName,dpi = 450,transparent=True)
-            np.save("results/lattice_output.npy", img.astype(np.uint8))  # save as 0-1 ints
+            # Find unique filename like lattice_output.npy, lattice_output1.npy, etc.
+            i = 0
+            base_path = "results/lattice_output"
+            while True:
+                candidate_path = f"{base_path}{i if i > 0 else ''}.npy"
+                if not os.path.exists(candidate_path):
+                    break
+                i += 1
 
-        if self.interactive:  
+            np.save(candidate_path, img.astype(np.uint8))
+            print(f"✅ Saved lattice to {candidate_path}")
+
+        if self.interactive:
             plt.pause(0.01)
 
     def plotConvergence(self):
