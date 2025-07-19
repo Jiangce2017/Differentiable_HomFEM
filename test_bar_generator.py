@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage import measure
 from stl import mesh
-import os
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-
+from skimage import measure
+import trimesh
+from shapely.geometry import Polygon, MultiPolygon
+import os
 
 def generate_dogbone_mask(length_mm=166, width_gauge_mm=14, width_ends_mm=20, length_gauge_mm=58, resolution=0.5):
     pixel_per_mm = resolution
@@ -70,30 +72,47 @@ def preview_mesh_3d(verts, faces):
 
 def extrude_and_export_stl(lattice_2d, thickness_mm, voxel_size_mm=2.0,
                            filename="results/dogbones/dogbone_lattice.stl"):
-    # Create 3D voxel array
-    voxels = np.repeat(lattice_2d[:, :, np.newaxis], int(thickness_mm), axis=2)
+    """
+    Extrude a 2D binary array into a 3D STL file using exact contours.
+    """
 
-    # Invert the voxel values so green (1s) = solid
-    voxels = voxels.astype(bool)
-    voxels = ~voxels
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    # Convert to mesh using marching cubes
-    verts, faces, _, _ = measure.marching_cubes(voxels, level=0.5)
+    # Find contours from binary mask
+    contours = measure.find_contours(lattice_2d, level=0.5)
 
-    # Scale to mm
-    verts *= voxel_size_mm
+    if not contours:
+        raise ValueError("No contours found in lattice pattern!")
 
-    # Preview the mesh in 3D
-    preview_mesh_3d(verts, faces)
+    polygons = []
+    for contour in contours:
+        contour_mm = contour[:, ::-1] * voxel_size_mm  # flip (row, col) to (x, y)
+        poly = Polygon(contour_mm)
+        if poly.is_valid and poly.area > 0:
+            polygons.append(poly)
 
-    # Create mesh and export
-    solid = mesh.Mesh(np.zeros(faces.shape[0], dtype=mesh.Mesh.dtype))
-    for i, f in enumerate(faces):
-        for j in range(3):
-            solid.vectors[i][j] = verts[f[j], :]
+    # Combine all into MultiPolygon or use single Polygon
+    geometry = MultiPolygon(polygons) if len(polygons) > 1 else polygons[0]
 
-    solid.save(filename)
-    print(f"STL file saved to {filename}")
+    # Extrude each polygon separately, then combine
+    if isinstance(geometry, Polygon):
+        solid = trimesh.creation.extrude_polygon(geometry, height=thickness_mm)
+    else:
+        meshes = []
+        for poly in geometry.geoms:
+            try:
+                extruded = trimesh.creation.extrude_polygon(poly, height=thickness_mm)
+                meshes.append(extruded)
+            except Exception as e:
+                print(f"⚠️ Skipped polygon due to error: {e}")
+
+        if not meshes:
+            raise RuntimeError("No valid extruded polygons!")
+        solid = trimesh.util.concatenate(meshes)
+
+    # Export STL
+    solid.export(filename)
+    print(f"✅ STL file saved to {filename}")
 
 
 def main():

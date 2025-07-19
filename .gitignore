@@ -4,3 +4,4 @@
 !.gitignore
 
 /results/dogbones
+/test_bar_generator.py

@@ -27,7 +27,7 @@ default: &DEFAULT
   numLayers: 5 # the depth of the NN
   numNeuronsPerLyr: 20 # the height of the NN
   minEpochs: 100  # minimum number of iterations
-  maxEpochs: 400  # Max number of iterations
+  maxEpochs: 200  # Max number of iterations
   penal: 2  # SIMP penalization constant, starting value
   Emin: 1e-6
   Emax: 1.0
