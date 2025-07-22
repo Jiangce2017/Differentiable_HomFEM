@@ -4,6 +4,9 @@ from skimage import measure
 import os
 import trimesh
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib import cm
+import matplotlib
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, length_gauge_mm=57, pixel_per_mm = 20): 
     
@@ -25,15 +28,21 @@ def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, le
     domain[:gage_start_px, :] = 1
     domain[gage_start_px+length_gauge_px:, :] = 1
 
-    return domain
+    return domain, gage_start_px,length_gauge_px,width_ends_px,width_gauge_px
 
-def tile_lattice_to_mask(lattice_tile, mask,tentile_direction):
-    tiled = np.zeros_like(mask, dtype=np.uint8)
+def tile_lattice_to_mask(lattice_tile, mask,tentile_direction,gage_start_px,length_gauge_px,width_ends_px,width_gauge_px):
+    #tiled = np.zeros_like(mask, dtype=np.uint8)
+    tiled = mask.copy()
+    #tiled = np.ones_like(mask, dtype=np.uint8)
+    #tiled[mask] = 1
     tile_h, tile_w = lattice_tile.shape
     print("tile_h: {}, tile_w: {}".format(tile_h, tile_w))
 
-    for y in range(0, mask.shape[0] - tile_h + 1, tile_h):
-        for x in range(0, mask.shape[1] - tile_w + 1, tile_w):
+    # for y in range(0, mask.shape[0] - tile_h + 1, tile_h):
+    #     for x in range(0, mask.shape[1] - tile_w + 1, tile_w):
+    for y in range(gage_start_px, gage_start_px+length_gauge_px - tile_h + 1, tile_h):
+        for x in range((width_ends_px-width_gauge_px)//2, (width_ends_px+width_gauge_px)//2 - tile_w + 1, tile_w):
+    
             if mask[y:y+tile_h, x:x+tile_w].all():
                 if tentile_direction == 'y':
                     tiled[y:y+tile_h, x:x+tile_w] = lattice_tile
@@ -97,13 +106,24 @@ def main():
     plt.imshow(lattice_tile, cmap='Greens')
     plt.title("Lattice")
     plt.axis('off')
+    axes = plt.gca()
+    cmap = plt.get_cmap('Greens')
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
+    m = cm.ScalarMappable(cmap=cmap, norm=norm)
+    m.set_array([])
+    divider = make_axes_locatable(axes)
+    cax = divider.append_axes("right", size="3%", pad="2%")
+    cbar = plt.colorbar(m, cax=cax, aspect=0.5)
+    cbar.ax.tick_params(labelsize=10)
+    cbar.set_label("Density", fontsize=10)
+    plt.ticklabel_format(style="plain")
     plt.show()
 
     lattice_resolution = lattice_tile.shape[0]
     lattice_size_mm = 2
     pixel_per_mm = lattice_resolution // lattice_size_mm
-    domain_mask = generate_dogbone_mask(length_mm=length_mm, width_gauge_mm=width_gauge_mm, width_ends_mm=width_ends_mm, length_gauge_mm=length_gauge_mm,pixel_per_mm=pixel_per_mm)
-    tiled_lattice = tile_lattice_to_mask(lattice_tile, domain_mask,tentile_direction)
+    domain_mask, gage_start_px,length_gauge_px,width_ends_px,width_gauge_px = generate_dogbone_mask(length_mm=length_mm, width_gauge_mm=width_gauge_mm, width_ends_mm=width_ends_mm, length_gauge_mm=length_gauge_mm,pixel_per_mm=pixel_per_mm)
+    tiled_lattice = tile_lattice_to_mask(lattice_tile, domain_mask,tentile_direction, gage_start_px,length_gauge_px,width_ends_px,width_gauge_px)
 
     # Optional: visualize the 2D layout
     plt.imshow(tiled_lattice, cmap='Greens')
