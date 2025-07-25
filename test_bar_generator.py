@@ -31,17 +31,15 @@ def generate_dogbone_mask(length_mm=165, width_gauge_mm=13, width_ends_mm=19, le
     return domain, gage_start_px,length_gauge_px,width_ends_px,width_gauge_px
 
 def tile_lattice_to_mask(lattice_tile, mask,tentile_direction,gage_start_px,length_gauge_px,width_ends_px,width_gauge_px):
-    #tiled = np.zeros_like(mask, dtype=np.uint8)
-    tiled = mask.copy()
-    #tiled = np.ones_like(mask, dtype=np.uint8)
-    #tiled[mask] = 1
+    tiled = np.zeros_like(mask, dtype=np.uint8)
+    #tiled = mask.copy()
     tile_h, tile_w = lattice_tile.shape
     print("tile_h: {}, tile_w: {}".format(tile_h, tile_w))
 
-    # for y in range(0, mask.shape[0] - tile_h + 1, tile_h):
-    #     for x in range(0, mask.shape[1] - tile_w + 1, tile_w):
-    for y in range(gage_start_px, gage_start_px+length_gauge_px - tile_h + 1, tile_h):
-        for x in range((width_ends_px-width_gauge_px)//2, (width_ends_px+width_gauge_px)//2 - tile_w + 1, tile_w):
+    for y in range(0, mask.shape[0] - tile_h + 1, tile_h):
+        for x in range(0, mask.shape[1] - tile_w + 1, tile_w):
+    # for y in range(gage_start_px, gage_start_px+length_gauge_px - tile_h + 1, tile_h):
+    #     for x in range((width_ends_px-width_gauge_px)//2, (width_ends_px+width_gauge_px)//2 - tile_w + 1, tile_w):
     
             if mask[y:y+tile_h, x:x+tile_w].all():
                 if tentile_direction == 'y':
