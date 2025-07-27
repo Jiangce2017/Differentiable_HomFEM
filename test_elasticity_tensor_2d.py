@@ -46,8 +46,8 @@ def inspect_sample(index, shape_data, prop_data):
     print(f"\n📉 Relative Frobenius Norm Error: {error:.4%}")
 
 if __name__ == '__main__':
-    sample_range = range(12700, 12940)
-    individual_sample_index = 340  # or an integer index
+    sample_range = range(1200, 1300)
+    individual_sample_index = 107  # or an integer index
 
     shape_data, prop_data = load_full_dataset()
 

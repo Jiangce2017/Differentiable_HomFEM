@@ -9,9 +9,9 @@ def elasticity(xPhys):
     nely, nelx = np.shape(xPhys) # since xPhys is a 2x2 then number of elements in x and y are 2
 
     ## MATERIAL PROPERTIES:
-    EO = np.float64(1.0) # Young's Modulus of Solid
-    Emin = np.float64(1e-9) #Young's Modulus of a non-solid
-    nu = np.float64(0.3) # Poisson's ratio
+    EO = np.float64(1252.72) # Young's Modulus of Solid
+    Emin = np.float64(EO*1e-6) #Young's Modulus of a non-solid
+    nu = np.float64(0.4) # Poisson's ratio
 
     ## PREPARE FINITE ELEMENT ANALYSIS builds 8x8 stiffness matrix
     A11 = np.array([[12, 3, -6, -3], [3, 12, 3, 0], [-6, 3, 12, -3], [-3, 0, -3, 12]], dtype=np.float64) # represents normal strain
