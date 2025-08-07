@@ -2,16 +2,16 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import spsolve
 
-def elasticity(xPhys):
-    xPhys = xPhys.astype(np.float64)  # ensure input is double precision. Xphys is the matrix
+def elasticity(xPhys, E0=1.0, Emin=1e-9, nu=0.3):
+    #xPhys = xPhys.astype(np.float64)  # ensure input is double precision. Xphys is the matrix
 
     penal = 1.0 # penalization factor: no effect since it is 1
     nely, nelx = np.shape(xPhys) # since xPhys is a 2x2 then number of elements in x and y are 2
 
-    ## MATERIAL PROPERTIES:
-    EO = np.float64(1.0) # Young's Modulus of Solid
-    Emin = np.float64(1e-9) #Young's Modulus of a non-solid
-    nu = np.float64(0.3) # Poisson's ratio
+    # ## MATERIAL PROPERTIES:
+    # E0 = np.float64(1.0) # Young's Modulus of Solid
+    # Emin = np.float64(1e-9) #Young's Modulus of a non-solid
+    # nu = np.float64(0.3) # Poisson's ratio
 
     ## PREPARE FINITE ELEMENT ANALYSIS builds 8x8 stiffness matrix
     A11 = np.array([[12, 3, -6, -3], [3, 12, 3, 0], [-6, 3, 12, -3], [-3, 0, -3, 12]], dtype=np.float64) # represents normal strain
@@ -87,7 +87,7 @@ def elasticity(xPhys):
     ## FE-ANALYSIS
     #Vectorize domain. It scales K by young's modulus and penal
     sK = (KE.flatten(order='F')[:, np.newaxis] *
-         (Emin + xPhys.flatten(order='F').T ** penal * (EO - Emin)))[np.newaxis, :].reshape(-1, 1, order='F')
+         (Emin + xPhys.flatten(order='F').T ** penal * (E0 - Emin)))[np.newaxis, :].reshape(-1, 1, order='F')
 
     #assembles global stiffness matrix K from elements
     K = sp.coo_matrix((sK.flatten(order='F'), (iK.flatten(order='F') - 1, jK.flatten(order='F') - 1)),
@@ -128,7 +128,7 @@ def elasticity(xPhys):
             qe[i, j] = np.reshape(np.sum((U1[edofMat - 1] @ KE) * U2[edofMat - 1], axis=1), (nely, nelx), order='F') / (nelx * nely)
 
             #Integrates the energy density across the material domain to get the effective elasticity tensor
-            Q[i, j] = np.sum((Emin + xPhys ** penal * (EO - Emin)) * qe[i, j])
+            Q[i, j] = np.sum((Emin + xPhys ** penal * (E0 - Emin)) * qe[i, j])
 
     Q[np.abs(Q) < 1e-6] = 0  # if value close to 0, it will be 0
     return Q

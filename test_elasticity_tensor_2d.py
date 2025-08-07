@@ -46,22 +46,42 @@ def inspect_sample(index, shape_data, prop_data):
     print(f"\n📉 Relative Frobenius Norm Error: {error:.4%}")
 
 if __name__ == '__main__':
-    sample_range = range(12700, 12940)
-    individual_sample_index = 340  # or an integer index
 
-    shape_data, prop_data = load_full_dataset()
+    xPhys = np.ones((50, 50))  # Example shape data
+    Q = elasticity(xPhys,E0=1.0, Emin=1e-9, nu=0.3)
+    print("Computed Elasticity Tensor Q:")
+    print(Q)
+    E0 = 1
+    nu = 0.3
+    C = E0/(1-nu**2) * np.array([[1, nu, 0], [nu, 1, 0], [0, 0, (1-nu)/2]])
+    print("\nExpected Elasticity Tensor C:")
+    print(C)
 
-    # 🔄 Parallel computation of errors
-    error_list = Parallel(n_jobs=-1)(  # use all available cores
-        delayed(compute_error)(idx, shape_data, prop_data) for idx in sample_range
-    )
+    xPhys = np.load("results/jury_data.npy")
+    #xPhys = np.load("results/lattice_output.npy")
+    #xPhys = np.load("results/20_20.nt")
+    # print(xPhys.files)
 
-    avg_error = np.mean(error_list)
-    print(f"\n📊 Average Relative Error over {len(sample_range)} samples: {avg_error:.4%}")
+    Q = elasticity(xPhys,E0=1255.0, Emin=1e-9, nu=0.3)
+    print("Computed Elasticity Tensor Q:")
+    print(Q)
 
-    # 🧪 Optional individual sample inspection
-    if individual_sample_index is not None:
-        try:
-            inspect_sample(individual_sample_index, shape_data, prop_data)
-        except Exception as e:
-            print(f"\n⚠️ Could not evaluate sample {individual_sample_index}: {e}")
+    # sample_range = range(12700, 12940)
+    # individual_sample_index = 340  # or an integer index
+
+    # shape_data, prop_data = load_full_dataset()
+
+    # # 🔄 Parallel computation of errors
+    # error_list = Parallel(n_jobs=-1)(  # use all available cores
+    #     delayed(compute_error)(idx, shape_data, prop_data) for idx in sample_range
+    # )
+
+    # avg_error = np.mean(error_list)
+    # print(f"\n📊 Average Relative Error over {len(sample_range)} samples: {avg_error:.4%}")
+
+    # # 🧪 Optional individual sample inspection
+    # if individual_sample_index is not None:
+    #     try:
+    #         inspect_sample(individual_sample_index, shape_data, prop_data)
+    #     except Exception as e:
+    #         print(f"\n⚠️ Could not evaluate sample {individual_sample_index}: {e}")

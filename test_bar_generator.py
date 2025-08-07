@@ -75,6 +75,13 @@ def extrude_and_export_stl(lattice_2d, filename="results/dogbones/dogbone_lattic
     verts = rescale_dimension(verts, target_dim)
 
     mesh = trimesh.Trimesh(vertices=verts, faces=faces)
+
+    # Check for watertightness
+    is_watertight = mesh.is_watertight
+
+    print(f"Is the mesh watertight? {is_watertight}")
+
+    
     mesh.export(filename)
     print(f"STL file saved to {filename}")
 
