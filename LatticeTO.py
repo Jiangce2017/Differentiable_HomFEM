@@ -72,6 +72,56 @@ class TopologyOptimizer:
                 ctr += 1 
         xy = torch.tensor(xy, requires_grad = True).float().view(-1,2).to(device) 
         return xy, nonDesignIdx 
+    
+    def density_filter(self, rho, xy, r_min):
+        """
+        Vectorized density filter using distance-weighted average.
+
+        Parameters:
+        - rho: (N,) tensor of densities
+        - xy: (N,2) tensor of coordinates
+        - r_min: filtering radius
+
+        Returns:
+        - filtered_rho: (N,) tensor
+        """
+        # Compute pairwise distances (N x N)
+        dist = torch.cdist(xy, xy, p=2)  # Euclidean distance
+        #weight = torch.clamp(r_min - dist, min=0.0)  # (N x N), clamp negative values to 0
+        weight = r_min > dist
+        weight = weight.float()  # Convert boolean to float
+        weight = weight / (weight.sum(dim=1, keepdim=True) + 1e-8)  # Normalize weights along rows to prevent division by zero
+        #weight = torch.softmax(weight, dim=1)  # Normalize weights along rows
+        filtered_rho = weight @ rho  # (N x N) @ (N,) → (N,)
+
+        # weighted_rho = (weight * rho.unsqueeze(0))  # Broadcast rho: (1,N) → (N,N)
+
+
+        # filtered_rho = weighted_rho.sum(dim=1) / (weight.sum(dim=1) + 1e-8)
+
+        return filtered_rho
+    
+    def sensitivity_filter(self, grad_rho, xy, r_min):
+        """
+        Applies sensitivity filtering to the gradient of the design variables.
+        
+        Parameters:
+        - grad_rho: (N,) raw gradient tensor of objective w.r.t. rho
+        - xy: (N,2) tensor of element coordinates
+        - r_min: minimum filter radius
+
+        Returns:
+        - filtered_grad: (N,) filtered gradient tensor
+        """
+        with torch.no_grad():
+            dist = torch.cdist(xy, xy, p=2)  # Shape: (N, N)
+            weight = torch.clamp(r_min - dist, min=0.0)  # Shape: (N, N)
+
+            weighted_grad = weight @ grad_rho  # (N,N) @ (N,) → (N,)
+            normalization = weight.sum(dim=1) + 1e-8  # Prevent divide by zero
+
+        return weighted_grad / normalization
+
 
     def optimizeDesign(self,config, desiredVolumeFraction, desiredQ):
         manualSeed = 1234  # NN are seeded manually 
@@ -105,7 +155,16 @@ class TopologyOptimizer:
         batch_x =  self.xy.view(-1,2).float().to(device)
         for epoch in range(config.maxEpochs):
             self.optimizer.zero_grad()
+
             nn_rho = self.topNet(batch_x,1,self.nonDesignIdx)
+            nn_rho = self.density_filter(nn_rho, self.xy.view(-1, 2).float().to(device), r_min=config.filterRadius)
+            
+            # # Apply minimum-length filtering
+            # with torch.no_grad():  # Filtering itself doesn't require gradients
+            #      nn_rho = self.density_filter(nn_rho, self.xy.view(-1, 2).float().to(device), r_min=config.filterRadius)
+            # # Detach and re-enable grad for backprop
+            # nn_rho = nn_rho_filtered.clone().detach().requires_grad_(True)
+
             Q = self.FE.solve(nn_rho)
 
             objective = torch.linalg.norm(Q-desiredQ) / torch.linalg.norm(desiredQ)
@@ -115,9 +174,30 @@ class TopologyOptimizer:
             loss = self.objective+ alpha*(pow(volConstraint,2))
 
             alpha = min(alphaMax, alpha + alphaIncrement) 
+
             loss.backward(retain_graph=True) 
             torch.nn.utils.clip_grad_norm_(self.topNet.parameters(),nrmThreshold)
             self.optimizer.step()
+
+            # loss.backward(retain_graph=True)
+            # # Apply sensitivity filtering only to grad of rho
+            # # if config.nn_type == 'SIMP':
+            # with torch.no_grad():
+            #     if config.nn_type == 'SIMP':
+            #         rho_param = self.topNet.model.rho
+            #     else:
+            #         #rho_param = self.topNet.parameters()
+            #         rho_param = torch.cat([p.view(-1) for p in self.topNet.parameters()])
+            #     if rho_param.grad is not None:
+            #         grad = rho_param.grad.view(-1)
+            #         xy_coords = self.xy.view(-1, 2).float().to(device)
+            #         filtered_grad = self.sensitivity_filter(grad, xy_coords, config.filterRadius)
+            #         rho_param.grad.copy_(filtered_grad.view_as(rho_param))
+
+            # torch.nn.utils.clip_grad_norm_(self.topNet.parameters(), nrmThreshold)
+            # self.optimizer.step()
+
+
             if(volConstraint < 0.05): # Only check for gray when close to solving. Saves computational cost  
                 greyElements = torch.sum((nn_rho > 0.05)*(nn_rho < 0.95)).item()  
                 relGreyElements = greyElements/nn_rho.shape[0]
@@ -147,8 +227,8 @@ class TopologyOptimizer:
         batch_x = self.xy.view(-1,2).float().to(device)  
         nn_rho = self.topNet(batch_x,1,self.nonDesignIdx)
         nn_rho = nn_rho.to('cpu').detach().numpy()
-        nn_rho[nn_rho>0.5]=1
-        nn_rho[nn_rho<0.5]=0
+        # nn_rho[nn_rho>0.5]=1
+        # nn_rho[nn_rho<0.5]=0
 
         img = np.flip(nn_rho.reshape(self.FE.nely,self.FE.nelx).transpose(),axis=0)
         #true_rho = nn_rho

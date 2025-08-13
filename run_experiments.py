@@ -29,8 +29,8 @@ plt.close('all')
 start = time.perf_counter()
 data_type = torch.float32
 topOpt = TopologyOptimizer(config,data_type)
-desiredVolumeFraction = 0.7
-desiredQ = torch.tensor([[0.8, 0.01, 0.0], [0.01, 0.4, 0.0], [0.0, 0.0, 0.02]], dtype = data_type)
+desiredVolumeFraction = 0.46 #can change
+desiredQ = torch.tensor([[0.267, 0.021, 0.0], [0.021, 0.111, 0.0], [0.0, 0.0, 0.005]], dtype = data_type)
 topOpt.optimizeDesign(config,desiredVolumeFraction, desiredQ) 
 print("Time taken (secs): {:.2F}".format( time.perf_counter() - start))
 print(topOpt.exper_name)
