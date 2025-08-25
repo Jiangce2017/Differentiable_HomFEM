@@ -44,6 +44,16 @@ class TopologyOptimizer:
         self.nonDesignRegion = {'Rect': None, 'Circ' : None, 'Annular' : None } 
 
         self.exper_name = config.nn_type+ "_"+config.cell_type + "_" + str(config.desiredVolumeFraction) 
+
+         # Length scale parameters
+        self.eta_d = 0.3  # Lower threshold
+        self.eta_i = 0.5  # Intermediate threshold  
+        self.eta_e = 0.7  # Upper threshold
+        self.beta = 32    # Steepness parameter for Heaviside
+        #self.c_param = config.filterRadius**4  # Parameter for structural indicators
+        self.c_param = 200 # Parameter for structural indicators
+        self.epsilon = 1e-7  # Relaxation parameter for constraints
+
         self.initializeFE(config,data_type)
 
     def initializeFE(self,config,data_type):
@@ -74,66 +84,79 @@ class TopologyOptimizer:
         return xy, nonDesignIdx 
     
     def density_filter(self, rho, xy, r_min):
-        """
-        Vectorized density filter using distance-weighted average.
 
-        Parameters:
-        - rho: (N,) tensor of densities
-        - xy: (N,2) tensor of coordinates
-        - r_min: filtering radius
-
-        Returns:
-        - filtered_rho: (N,) tensor
-        """
         # Compute pairwise distances (N x N)
         dist = torch.cdist(xy, xy, p=2)  # Euclidean distance
         #weight = torch.clamp(r_min - dist, min=0.0)  # (N x N), clamp negative values to 0
-        weight = r_min > dist
-        weight = weight.float()  # Convert boolean to float
-        weight = weight / (weight.sum(dim=1, keepdim=True) + 1e-8)  # Normalize weights along rows to prevent division by zero
-        #weight = torch.softmax(weight, dim=1)  # Normalize weights along rows
-        filtered_rho = weight @ rho  # (N x N) @ (N,) → (N,)
+        weight_mask = r_min > dist
+        weight = torch.where(weight_mask, r_min - dist, torch.zeros_like(dist))  # (N x N)
+        rho_tilde = (weight @ rho) /(weight.sum(dim=1) + 1e-8)  # (N x N) @ (N,) → (N,)
+        rho_Phys = (np.tanh(self.beta * self.eta_i) + 
+                torch.tanh(self.beta * (rho_tilde - self.eta_i))) / \
+               (np.tanh(self.beta * self.eta_i) + 
+                np.tanh(self.beta * (1.0 - self.eta_i)))
 
-        # weighted_rho = (weight * rho.unsqueeze(0))  # Broadcast rho: (1,N) → (N,N)
-
-
-        # filtered_rho = weighted_rho.sum(dim=1) / (weight.sum(dim=1) + 1e-8)
-
-        return filtered_rho
+        return rho_tilde, rho_Phys
     
-    def sensitivity_filter(self, grad_rho, xy, r_min):
-        """
-        Applies sensitivity filtering to the gradient of the design variables.
+    def _compute_gradients(self, xTilde):
+        """Compute gradients of filtered field using finite differences"""
+        xTilde_2d = xTilde.reshape((self.nelx, self.nely))
         
-        Parameters:
-        - grad_rho: (N,) raw gradient tensor of objective w.r.t. rho
-        - xy: (N,2) tensor of element coordinates
-        - r_min: minimum filter radius
+        # Compute gradients using central differences
+        grad_x = torch.zeros_like(xTilde_2d)
+        grad_y = torch.zeros_like(xTilde_2d)
+        
+        # Interior points
+        grad_x[1:-1, :] = (xTilde_2d[2:, :] - xTilde_2d[:-2, :]) / 2.0
+        grad_y[:, 1:-1] = (xTilde_2d[:, 2:] - xTilde_2d[:, :-2]) / 2.0
+        
+        # Boundary points (forward/backward differences)
+        grad_x[0, :] = xTilde_2d[1, :] - xTilde_2d[0, :]
+        grad_x[-1, :] = xTilde_2d[-1, :] - xTilde_2d[-2, :]
+        grad_y[:, 0] = xTilde_2d[:, 1] - xTilde_2d[:, 0]
+        grad_y[:, -1] = xTilde_2d[:, -1] - xTilde_2d[:, -2]
+        
+        grad_magnitude = torch.sqrt(grad_x**2 + grad_y**2)
+        
+        return grad_magnitude.flatten()
+    
+    def _structural_indicators(self, xTilde, xPhys):
+        """Compute structural indicator functions"""
+        grad_mag = self._compute_gradients(xTilde)
+        
+        # Structural indicators (Equations 8 and 9)
+        I_s = xPhys * torch.exp(-self.c_param * grad_mag**2)
+        I_v = (1 - xPhys) * torch.exp(-self.c_param * grad_mag**2)
+        
+        return I_s, I_v
+    
+    def _geometric_constraints(self, xTilde, I_s, I_v):
+        """Compute geometric constraints (Equations 10 and 11)"""
+        # Constraint for solid phase
 
-        Returns:
-        - filtered_grad: (N,) filtered gradient tensor
-        """
-        with torch.no_grad():
-            dist = torch.cdist(xy, xy, p=2)  # Shape: (N, N)
-            weight = torch.clamp(r_min - dist, min=0.0)  # Shape: (N, N)
-
-            weighted_grad = weight @ grad_rho  # (N,N) @ (N,) → (N,)
-            normalization = weight.sum(dim=1) + 1e-8  # Prevent divide by zero
-
-        return weighted_grad / normalization
-
+        weight_e = xTilde - self.eta_e
+        weight_e[weight_e > 0] = 0
+        g_s_terms = I_s * weight_e**2
+        g_s = torch.mean(g_s_terms)
+        
+        # Constraint for void phase  
+        weight_d = self.eta_d - xTilde
+        weight_d[weight_d > 0] = 0
+        g_v_terms = I_v * weight_d**2
+        g_v = torch.mean(g_v_terms)
+        
+        return g_s, g_v
 
     def optimizeDesign(self,config, desiredVolumeFraction, desiredQ):
         manualSeed = 1234  # NN are seeded manually 
         set_seed(manualSeed)
         self.topNet = TopNet(config,self.symXAxis,self.symYAxis).to(device)
         self.objective = 0.
-        self.convergenceHistory = []
+        #self.convergenceHistory = []
         train_logger = Logger(
             osp.join(config.results_dir, self.exper_name+'train.log'),
             ['ep', 'elasticity_loss','volume_loss']
         )
-        self.convergenceHistory = [] 
         savedNetFileName = osp.join(config.results_dir, str(self.nelx) + '_' + str(self.nely) +  '.nt')
         alphaMax = 100*desiredVolumeFraction 
         alphaIncrement= 0.08
@@ -157,21 +180,22 @@ class TopologyOptimizer:
             self.optimizer.zero_grad()
 
             nn_rho = self.topNet(batch_x,1,self.nonDesignIdx)
-            nn_rho = self.density_filter(nn_rho, self.xy.view(-1, 2).float().to(device), r_min=config.filterRadius)
-            
-            # # Apply minimum-length filtering
-            # with torch.no_grad():  # Filtering itself doesn't require gradients
-            #      nn_rho = self.density_filter(nn_rho, self.xy.view(-1, 2).float().to(device), r_min=config.filterRadius)
-            # # Detach and re-enable grad for backprop
-            # nn_rho = nn_rho_filtered.clone().detach().requires_grad_(True)
+            rho_tilde, rho_Phys = self.density_filter(nn_rho, self.xy.view(-1, 2).float().to(device), r_min=config.filterRadius)
 
-            Q = self.FE.solve(nn_rho)
+            Q = self.FE.solve(rho_Phys)
 
             objective = torch.linalg.norm(Q-desiredQ) / torch.linalg.norm(desiredQ)
-            volConstraint =((torch.mean(nn_rho)/desiredVolumeFraction) - 1.0) 
-            currentVolumeFraction = torch.mean(nn_rho).item() 
+            volConstraint =((torch.mean(rho_Phys)/desiredVolumeFraction) - 1.0) 
+            #volConstraint = torch.mean(rho_Phys)
+            currentVolumeFraction = torch.mean(rho_Phys).item() 
             self.objective = objective
             loss = self.objective+ alpha*(pow(volConstraint,2))
+            #loss = self.objective+ 0.1*(pow(volConstraint,2))
+            # Apply geometric constraints after initial topology formation
+            if config.apply_geo_constraints and epoch >= config.constraint_start_iter:
+                I_s, I_v = self._structural_indicators(rho_tilde, rho_Phys)
+                g_s, g_v = self._geometric_constraints(rho_tilde, I_s, I_v)
+                loss += alpha*(pow(g_s + g_v,2))
 
             alpha = min(alphaMax, alpha + alphaIncrement) 
 
@@ -179,58 +203,40 @@ class TopologyOptimizer:
             torch.nn.utils.clip_grad_norm_(self.topNet.parameters(),nrmThreshold)
             self.optimizer.step()
 
-            # loss.backward(retain_graph=True)
-            # # Apply sensitivity filtering only to grad of rho
-            # # if config.nn_type == 'SIMP':
-            # with torch.no_grad():
-            #     if config.nn_type == 'SIMP':
-            #         rho_param = self.topNet.model.rho
-            #     else:
-            #         #rho_param = self.topNet.parameters()
-            #         rho_param = torch.cat([p.view(-1) for p in self.topNet.parameters()])
-            #     if rho_param.grad is not None:
-            #         grad = rho_param.grad.view(-1)
-            #         xy_coords = self.xy.view(-1, 2).float().to(device)
-            #         filtered_grad = self.sensitivity_filter(grad, xy_coords, config.filterRadius)
-            #         rho_param.grad.copy_(filtered_grad.view_as(rho_param))
-
-            # torch.nn.utils.clip_grad_norm_(self.topNet.parameters(), nrmThreshold)
-            # self.optimizer.step()
-
-
-            if(volConstraint < 0.05): # Only check for gray when close to solving. Saves computational cost  
-                greyElements = torch.sum((nn_rho > 0.05)*(nn_rho < 0.95)).item()  
-                relGreyElements = greyElements/nn_rho.shape[0]
-            else:
-                relGreyElements = 1 
-            self.convergenceHistory.append([ self.objective.item(), currentVolumeFraction,loss.item(),relGreyElements]) 
+            # if(volConstraint < 0.05): # Only check for gray when close to solving. Saves computational cost  
+            #     greyElements = torch.sum((nn_rho > 0.05)*(nn_rho < 0.95)).item()  
+            #     relGreyElements = greyElements/nn_rho.shape[0]
+            # else:
+            #     relGreyElements = 1 
+            #self.convergenceHistory.append([ self.objective.item(), currentVolumeFraction,loss.item(),relGreyElements]) 
             train_logger.log({
                 'ep': epoch,             
-                'elasticity_loss': objective.item(),
+                'elasticity_loss':torch.max(torch.abs(Q-desiredQ)).item(),
                 'volume_loss': volConstraint.item()
             })
             if(epoch % 10 == 0):
-                print("{:3d} Elast_loss: {:.6F}; Volume_loss: {:.6F}; relGreyElems: {:.3F} "\
-                    .format(epoch, self.objective.item(),volConstraint.item(),relGreyElements))
+                print("{:3d} Elast_loss: {:.6F}; Volume_loss: {:.6F}; "\
+                    .format(epoch, torch.max(torch.abs(Q-desiredQ)).item(),volConstraint.item()))
                 if config.interactive:
-                    self.plotTO(epoch, saveFig=False,saveFrame=config.saveFrame) 
+                    self.plotTO(epoch, config.filterRadius, saveFig=False,saveFrame=config.saveFrame) 
             
-            if ((epoch > config.minEpochs ) & (relGreyElements < 0.035) & (volConstraint< 0) ):
-                break 
-        self.plotTO(epoch,saveFig=True, saveFrame=config.saveFrame) 
+            # if ((epoch > config.minEpochs ) & (relGreyElements < 0.035) & (volConstraint< 0) ):
+            #     break 
+        self.plotTO(epoch, config.filterRadius, saveFig=True, saveFrame=config.saveFrame) 
         
         ### save data
         torch.save(self.topNet, savedNetFileName)
         
-    def plotTO(self, iter,saveFig=True, saveFrame=False):
+    def plotTO(self, iter, r_min, saveFig=True, saveFrame=False):
         w = self.cell_width
         batch_x = self.xy.view(-1,2).float().to(device)  
         nn_rho = self.topNet(batch_x,1,self.nonDesignIdx)
-        nn_rho = nn_rho.to('cpu').detach().numpy()
+        rho_tilde, rho_Phys = self.density_filter(nn_rho, self.xy.view(-1, 2).float().to(device), r_min)
+        rho_Phys = rho_Phys.to('cpu').detach().numpy()
         # nn_rho[nn_rho>0.5]=1
         # nn_rho[nn_rho<0.5]=0
 
-        img = np.flip(nn_rho.reshape(self.FE.nely,self.FE.nelx).transpose(),axis=0)
+        img = np.flip(rho_Phys.reshape(self.FE.nely,self.FE.nelx).transpose(),axis=0)
         #true_rho = nn_rho
         if self.interactive:
             plt.ion() 
@@ -265,17 +271,17 @@ class TopologyOptimizer:
         if self.interactive:  
             plt.pause(0.01)
 
-    def plotConvergence(self):
-        self.convergenceHistory = np.array(self.convergenceHistory) 
-        plt.figure()
-        plt.semilogy(self.convergenceHistory[:,0], 'b:',label = 'Rel. Compliance')
-        plt.semilogy(self.convergenceHistory[:,1], 'r--',label = 'Vol. Fraction')
-        plt.title('Convergence Plots' ) 
-        #plt.title('Convergence plots; V_des = {:.2F}'.format(self.desiredVolumeFraction))
-        plt.xlabel('Iterations') 
-        plt.grid('True')
-        plt.legend(loc='lower left', shadow=True, fontsize='large')
-        fName = osp.join(self.results_dir,self.exper_name+'_convergence.png')
-        plt.savefig(fName,dpi = 450)
+    # def plotConvergence(self):
+    #     self.convergenceHistory = np.array(self.convergenceHistory) 
+    #     plt.figure()
+    #     plt.semilogy(self.convergenceHistory[:,0], 'b:',label = 'Rel. Compliance')
+    #     plt.semilogy(self.convergenceHistory[:,1], 'r--',label = 'Vol. Fraction')
+    #     plt.title('Convergence Plots' ) 
+    #     #plt.title('Convergence plots; V_des = {:.2F}'.format(self.desiredVolumeFraction))
+    #     plt.xlabel('Iterations') 
+    #     plt.grid('True')
+    #     plt.legend(loc='lower left', shadow=True, fontsize='large')
+    #     fName = osp.join(self.results_dir,self.exper_name+'_convergence.png')
+    #     plt.savefig(fName,dpi = 450)
 
     

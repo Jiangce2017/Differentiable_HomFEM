@@ -7,12 +7,14 @@ default: &DEFAULT
   lattice_dataset: 'strut'
   lattice_data_file_path: './data/struct/dataset_strut.pkl'
   vae_file_path: './data/struct/vae.pickle'
-  cell_width: 30
-  nelx: 30
-  nely: 30
+  cell_width: 50
+  nelx: 50
+  nely: 50
   len_x: 1
   len_y: 1
-  filterRadius: 0.2 # Tune based on your lattice resolution
+  filterRadius: 0.01
+  constraint_start_iter: 50
+  apply_geo_constraints: True
   max_grad: 10 # 10
   example: 3  # see ExperiemntSetting Class
   cell_type: 'lattice' # lattice or solid
