@@ -38,7 +38,7 @@ default: &DEFAULT
   useSavedNet: False # use a net previouslySaved  as starting point (exampleName_nelx_nely.nt in ./results folder)
   learningRate: 0.01 
   data_dir: './data/struct'
-  results_dir: './lattice_dataset4'
+  results_dir: '/scratch/jc14407/projects/Differentiable_HomFEM/lattice_dataset4'
 
   wandb:
       log: False
