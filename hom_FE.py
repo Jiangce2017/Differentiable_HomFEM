@@ -5,24 +5,25 @@ from scipy.sparse.linalg import spsolve
 import numpy.matlib
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import cvxopt 
-import cvxopt.cholmod
+# import cvxopt 
+# import cvxopt.cholmod
 import sys
-if sys.platform == 'linux':
-    import torch_sparse_solve 
+# if sys.platform == 'linux':
+#     import torch_sparse_solve 
 #-----------------------#
 #%%  structural FE
 class StructuralFE:
     #-----------------------#
-    def initializeSolver(self, data_type, nelx, nely, penal = 3,Emin = 1e-3, Emax = 1.0, nu = 0.3):
+    def initializeSolver(self, data_type, nelx, nely, device, penal = 3,Emin = 1e-3, Emax = 1.0, nu = 0.3):
         self.Emin = Emin
         self.Emax = Emax
         self.penal = penal
         self.nelx = nelx; # number of elements in x
         self.nely = nely; # numer of elements in y
+        self.device = device
         self.data_type = data_type
         self.ndof = 2*(nelx+1)*(nely+1) # total DoF
-        self.KE=self.getDMatrix_torch(Emax,nu)
+        self.KE=self.getDMatrix_torch(Emax,nu).to(device)
         nodenrs = np.arange(0, (1 + nelx) * (1 + nely), dtype=np.int32).reshape((1 + nely, 1 + nelx), order="F")
         self.edofVec = np.reshape(2 * nodenrs[:-1, :-1] + 2, (nelx * nely, 1), order="F")
         self.edofMat = np.tile(self.edofVec, (1, 8)) + np.tile(
@@ -33,7 +34,7 @@ class StructuralFE:
 
         ## PERIODIC BOUNDARY CONDITIONS
         e0 = torch.eye(3, dtype=data_type)
-        self.ufixed = torch.zeros((8, 3), dtype=data_type)
+        self.ufixed = torch.zeros((8, 3), dtype=data_type,device=device)
         
 
         self.alldofs = np.arange(0, 2 * (nely + 1) * (nelx + 1), dtype=np.int32)
@@ -95,7 +96,7 @@ class StructuralFE:
             -torch.vstack((K[self.d2, self.d4.T].T, (K[self.d3, self.d4.T] + K[self.d4, self.d4.T]).T)) @ self.wfixed
         )
 
-        U = torch.zeros((2 * (self.nely + 1) * (self.nelx + 1), 3), dtype=self.data_type)
+        U = torch.zeros((2 * (self.nely + 1) * (self.nelx + 1), 3), dtype=self.data_type,device=self.device)
         U[self.d1, :] = self.ufixed
         U[np.concatenate((self.d2, self.d3.ravel())), :] = torch.linalg.solve(Kr, rhs)
         # LU, pivots = torch.linalg.lu_factor(Kr)
@@ -108,4 +109,26 @@ class StructuralFE:
                 temp1 = torch.sum((U1[self.edofMat] @ self.KE) * U2[self.edofMat], dim=1).view(self.nely, self.nelx).permute(1,0)/ (self.nelx * self.nely)
                 Q[i, j] = torch.sum((self.Emin + xPhys ** self.penal * (self.Emax - self.Emin)) * temp1)
         return Q
+
+    def solvetorch_sparse(self,density):
+        self.u = torch.zeros((self.ndof,1))
+        KE = self.KE
+        f = torch.from_numpy(self.f)
+        f = f.type(torch.float64)
+        temp1 = torch.unsqueeze(torch.flatten(KE),dim=1)
+        temp2 = (self.Emin+(0.01 + density)**self.penal*(self.Emax-self.Emin))
+        sK=torch.flatten(torch.transpose(temp1*temp2,0,1))
+
+        indices = np.array([self.iK,self.jK])
+
+        K = torch.sparse_coo_tensor(indices, sK, size=(self.ndof,self.ndof),dtype=torch.float64).to_dense()
+        K_sub = K[self.free,:][:,self.free]
+        f_sub = f[self.free,:]
+        K_sub = torch.unsqueeze(K_sub,dim=0).to_sparse()
+        f_sub = torch.unsqueeze(f_sub,dim=0)
+        res = torch_sparse_solve.solve(K_sub, f_sub)
+        res = res.float()
+        self.u[self.free,0] = res[0,:,0]
+        self.Jelem = torch.sum((torch.matmul(self.u[self.edofMat].reshape(self.nelx*self.nely,8),KE) * self.u[self.edofMat].reshape(self.nelx*self.nely,8)),dim=1)
+        return self.u, self.Jelem
 

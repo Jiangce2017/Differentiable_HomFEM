@@ -3,16 +3,18 @@ default: &DEFAULT
   #General
   verbose: True
   device: 'cuda:0'
-  interactive: True
+  interactive: False
   lattice_dataset: 'strut'
   lattice_data_file_path: './data/struct/dataset_strut.pkl'
   vae_file_path: './data/struct/vae.pickle'
-  cell_width: 30
-  nelx: 30
-  nely: 30
+  cell_width: 50
+  nelx: 50
+  nely: 50
   len_x: 1
   len_y: 1
-  filterRadius: 0.2 # Tune based on your lattice resolution
+  apply_geo_constraints: True
+  constraint_start_iter: 100
+  filterRadius: 0.3 # Tune based on your lattice resolution
   max_grad: 10 # 10
   example: 3  # see ExperiemntSetting Class
   cell_type: 'lattice' # lattice or solid
@@ -28,16 +30,15 @@ default: &DEFAULT
   numLayers: 5 # the depth of the NN
   numNeuronsPerLyr: 20 # the height of the NN
   minEpochs: 100  # minimum number of iterations
-  maxEpochs: 300  # Max number of iterations
+  maxEpochs: 1000  # Max number of iterations
   penal: 2  # SIMP penalization constant, starting value
   Emin: 1e-6
   Emax: 1.0
   nu: 0.3
   useSavedNet: False # use a net previouslySaved  as starting point (exampleName_nelx_nely.nt in ./results folder)
-  desiredVolumeFraction: 0.4
   learningRate: 0.01 
   data_dir: './data/struct'
-  results_dir: './results'
+  results_dir: './lattice_dataset4'
 
   wandb:
       log: False

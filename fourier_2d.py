@@ -5,8 +5,8 @@ from timeit import default_timer
 #from utilities3 import *
 import numpy as np
 
-torch.manual_seed(0)
-np.random.seed(0)
+# torch.manual_seed(0)
+# np.random.seed(0)
 
 ################################################################
 # fourier layer
