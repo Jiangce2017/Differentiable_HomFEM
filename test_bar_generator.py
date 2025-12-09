@@ -94,10 +94,10 @@ def rescale_dimension(verts, target_dim):
 
 
 def main():
-    length_mm = 166
-    width_gauge_mm = 14
-    width_ends_mm = 22
-    length_gauge_mm = 58
+    length_mm = 166*2
+    width_gauge_mm = 14*2
+    width_ends_mm = 22*2
+    length_gauge_mm = 58*2
     lattice_path = "results/lattice_output1.npy"
     tentile_direction = 'x'
 
@@ -123,7 +123,7 @@ def main():
     plt.show()
 
     lattice_resolution = lattice_tile.shape[0]
-    lattice_size_mm = 2
+    lattice_size_mm = 4
     pixel_per_mm = lattice_resolution // lattice_size_mm
     domain_mask, gage_start_px, length_gauge_px, width_ends_px, width_gauge_px = generate_dogbone_mask(
         length_mm=length_mm, width_gauge_mm=width_gauge_mm, width_ends_mm=width_ends_mm,

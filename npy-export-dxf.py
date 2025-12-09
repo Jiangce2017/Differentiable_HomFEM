@@ -39,14 +39,14 @@ def export_single_lattice_cell_dxf(lattice_tile, desired_size_mm=2.0):
 
 
 def main():
-    lattice_path = "results/lattice_output1.npy" #change based on which .npy you want
+    lattice_path = "results2/lattice_series_0_0.npy" #change based on which .npy you want
     if not os.path.exists(lattice_path):
         raise FileNotFoundError(f"Cannot find {lattice_path}")
 
     lattice_tile = np.load(lattice_path)
     assert lattice_tile.ndim == 2, "Lattice must be 2D!"
 
-    export_single_lattice_cell_dxf(lattice_tile, desired_size_mm=2.0)
+    export_single_lattice_cell_dxf(lattice_tile, desired_size_mm=3.0)
 
 
 if __name__ == "__main__":
